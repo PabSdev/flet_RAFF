@@ -26,46 +26,8 @@ driver_path = ChromeDriverManager().install()
 # URL del sistema RASFF con la tabla de incidencias
 RASFF_URL = "https://webgate.ec.europa.eu/rasff-window/screen/search?searchQueries=eyJkYXRlIjp7InN0YXJ0UmFuZ2UiOiIiLCJlbmRSYW5nZSI6IiJ9LCJjb3VudHJpZXMiOnt9LCJ0eXBlIjp7fSwibm90aWZpY2F0aW9uU3RhdHVzIjp7fSwicHJvZHVjdCI6e30sInJpc2siOnt9LCJyZWZlcmVuY2UiOiIiLCJzdWJqZWN0IjoiIn0%3D"
 
-def seleccionar_fecha_en_calendario(driver, fecha_seleccionada):
-    """Selecciona una fecha en el calendario emergente."""
-    # Formatear la fecha seleccionada
-    dia = fecha_seleccionada.strftime("%d").lstrip("0")  # Día sin ceros a la izquierda (ej. "5" en lugar de "05")
-    mes = fecha_seleccionada.strftime("%b").upper()      # Mes abreviado en mayúsculas (ej. "MAR")
-    año = fecha_seleccionada.strftime("%Y")              # Año completo (ej. "2025")
-
-    # Hacer clic en el botón del calendario para abrirlo
-    calendario_button = WebDriverWait(driver, 10).until(
-        EC.element_to_be_clickable((By.CSS_SELECTOR, "button.eui-date-range-selector__toggler"))
-    )
-    calendario_button.click()
-
-    # Esperar a que el calendario esté visible
-    WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((By.TAG_NAME, "mat-calendar"))
-    )
-
-    # Seleccionar el año
-    year_selector = WebDriverWait(driver, 10).until(
-        EC.element_to_be_clickable((By.XPATH, f"//button[contains(@aria-label, '{año}')]"))
-    )
-    year_selector.click()
-
-    # Seleccionar el mes
-    month_selector = WebDriverWait(driver, 10).until(
-        EC.element_to_be_clickable((By.XPATH, f"//button[contains(@aria-label, '{mes}')]"))
-    )
-    month_selector.click()
-
-    # Seleccionar el día
-    day_selector = WebDriverWait(driver, 10).until(
-        EC.element_to_be_clickable((By.XPATH, f"//td[contains(@aria-label, '{dia} {mes} {año}')]"))
-    )
-    day_selector.click()
-
-    # El calendario debería cerrarse automáticamente y llenar ambos campos si se selecciona el rango
-
 def extraer_alertas(fecha_seleccionada):
-    """Extrae las alertas del sistema RASFF filtrando por la fecha seleccionada en la barra de búsqueda."""
+    """Extrae las alertas del sistema RASFF y filtra por la fecha seleccionada."""
     driver = webdriver.Chrome(service=Service(driver_path), options=chrome_options)
     alertas = []
 
@@ -73,27 +35,7 @@ def extraer_alertas(fecha_seleccionada):
         print("Navegando a la página del RASFF...")
         driver.get(RASFF_URL)
 
-        # Esperar a que el formulario de búsqueda esté presente
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "search"))
-        )
-
-        # Seleccionar la fecha en el calendario para ambos campos (inicio y fin)
-        seleccionar_fecha_en_calendario(driver, fecha_seleccionada)
-
-        # Verificar que los campos se hayan llenado (opcional, para depuración)
-        start_date_input = driver.find_element(By.CSS_SELECTOR, "input.mat-start-date")
-        end_date_input = driver.find_element(By.CSS_SELECTOR, "input.mat-end-date")
-        print(f"Valor en Start Date: {start_date_input.get_attribute('value')}")
-        print(f"Valor en End Date: {end_date_input.get_attribute('value')}")
-
-        # Hacer clic en el botón "Search"
-        search_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Submit Search']"))
-        )
-        search_button.click()
-
-        # Esperar a que la tabla se actualice con los resultados filtrados
+        # Esperar a que la tabla esté presente
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "table.eui-table"))
         )
@@ -108,13 +50,17 @@ def extraer_alertas(fecha_seleccionada):
         # Extraer las filas de datos
         filas = tabla.find_elements(By.CSS_SELECTOR, "tbody tr")
 
-        # Extraer todas las filas sin filtrar manualmente (ya están filtradas por la búsqueda)
+        # Formatear la fecha seleccionada al formato "DD MMM YYYY" (ejemplo: "25 OCT 2023")
+        fecha_formateada = fecha_seleccionada.strftime("%d %b %Y").upper()
+
+        # Extraer y filtrar las filas por la fecha seleccionada
         for fila in filas:
             celdas = fila.find_elements(By.TAG_NAME, "td")
             datos_fila = {encabezados[i]: celdas[i].text.strip() for i in range(len(celdas))}
-            alertas.append(datos_fila)
+            if datos_fila.get("Date") == fecha_formateada:
+                alertas.append(datos_fila)
 
-        print(f"Se encontraron {len(alertas)} alertas para la fecha {fecha_seleccionada.strftime('%d/%m/%Y')}.")
+        print(f"Se encontraron {len(alertas)} alertas para la fecha {fecha_formateada}.")
 
     except Exception as e:
         print(f"Error al extraer las alertas: {e}")
@@ -178,7 +124,7 @@ def main(page: ft.Page):
         estado_texto.value = "Extrayendo datos, por favor espera..."
         page.update()
 
-        # Extraer alertas con la fecha seleccionada usando la barra de búsqueda
+        # Extraer alertas con la fecha seleccionada
         alertas = extraer_alertas(fecha_seleccionada)
 
         if alertas:
