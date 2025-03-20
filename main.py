@@ -54,8 +54,8 @@ def extraer_alertas(fecha_seleccionada):
         )
         time.sleep(3)
 
-        # Formatear fecha
-        fecha_formateada = fecha_seleccionada.strftime("%-d %b %Y").upper()
+        # Formatear fecha a "19 MAR 2025" (sin cero a la izquierda)
+        fecha_formateada = fecha_seleccionada.strftime("%d %b %Y").lstrip("0").upper()
 
         # Localizar tabla
         tabla = driver.find_element(
@@ -124,12 +124,11 @@ def main(page: ft.Page):
     selected_date_text = ft.Text("No se ha seleccionado fecha", color="#555555")
 
     def date_picker_changed(e):
-        fecha_str = e.data  # '2025-03-20' por ejemplo
-        fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
+        fecha_str = e.data  # Ejemplo: "2025-03-19T00:00:00.000"
+        fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%dT%H:%M:%S.%f")
         selected_date["value"] = fecha_obj
         selected_date_text.value = f"Fecha seleccionada: {fecha_obj.strftime('%d/%m/%Y')}"
         page.update()
-
 
     date_picker = ft.DatePicker(
         on_change=date_picker_changed,
@@ -140,12 +139,12 @@ def main(page: ft.Page):
     page.overlay.append(date_picker)
 
     def open_date_picker(_):
-        date_picker.open = True  # ← CORREGIDO
+        date_picker.open = True  # Abrir el DatePicker
         page.update()
 
     date_button = ft.ElevatedButton(
         "Seleccionar Fecha",
-        icon=ft.Icons.CALENDAR_TODAY,  # ← CORREGIDO
+        icon=ft.Icons.CALENDAR_TODAY,
         on_click=open_date_picker,
         style=ft.ButtonStyle(
             color="white",
